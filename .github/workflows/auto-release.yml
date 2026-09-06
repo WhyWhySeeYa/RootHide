@@ -188,12 +188,7 @@ jobs:
             echo "Release $TAG already exists, skipping."
             exit 0
           fi
-          BODY="Auto-built from ${REF} @ ${SHA}
-
-Patches applied:
-- auto-auth (no-verify supporter license, semantic patch via .github/scripts/auto-auth.py)
-
-Provenance: see source-provenance.txt in assets"
+          BODY="Auto-built from ${REF} @ ${SHA} | patches: auto-auth (no-verify supporter license) | provenance in assets"
           gh release create "$TAG" \
             "Application/${{ env.artifact }}" \
             --title "Dopamine RH auto build (${REF})" \
