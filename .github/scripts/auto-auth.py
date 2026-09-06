@@ -108,22 +108,3 @@ body = '''- (void)supporterLicensePressed
 src = replace_function_body(src, sig, body, 'DOSettingsController.m supporterLicensePressed')
 m_path.write_text(src)
 print('OK: DOSettingsController.m patched')
-
-# ---------- 3) DOMainViewController.m: 系统版本标签不显示 Supporter ----------
-v_path = ROOT / 'Application/Dopamine/UI/DOMainViewController.m'
-src = v_path.read_text()
-
-sig = '- (void)refreshSupporterState\n{'
-body = '''- (void)refreshSupporterState
-{
-    BOOL verified = DORHSupporterIsVerified();
-    if (self.customGlassThemeCard)
-        self.customGlassThemeCard.alpha = verified ? 1.0 : 0.44;
-
-    if (self.customGlassSystemLabel)
-        self.customGlassSystemLabel.text = [NSString stringWithFormat:@"iOS %@", UIDevice.currentDevice.systemVersion];
-}
-'''
-src = replace_function_body(src, sig, body, 'DOMainViewController.m refreshSupporterState')
-v_path.write_text(src)
-print('OK: DOMainViewController.m patched')

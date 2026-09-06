@@ -1441,7 +1441,7 @@ static NSInteger const DOCustomGlassSettingsSeparatorTag = 0xC651;
 
 - (void)supporterLicensePressed
 {
-    // MINIS-PATCH: 点击按钮直接自动授权（不再需要输入/粘贴激活码）
+    // AUTO-PATCH: 点击按钮直接自动授权（无需输入激活码）
     NSDictionary<NSString *, id> *info = DORHSupporterCurrentLicenseInfo();
     NSString *supporterID = [info[@"sid"] isKindOfClass:NSString.class] ? info[@"sid"] : nil;
     NSString *deviceCode = DORHSupporterDeviceCode();
@@ -1483,6 +1483,7 @@ static NSInteger const DOCustomGlassSettingsSeparatorTag = 0xC651;
                                           message:error.localizedDescription ?: @"Unable to verify supporter license"];
     }
 }
+
 
 - (void)rootHideHealthPressed
 {

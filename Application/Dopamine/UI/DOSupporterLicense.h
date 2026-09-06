@@ -98,7 +98,7 @@ static inline SecKeyRef DORHSupporterCreatePublicKey(void)
 static inline NSDictionary<NSString *, id> *DORHSupporterVerifyLicenseCode(NSString *licenseCode,
                                                                            NSError **error)
 {
-    // MINIS-PATCH: 移除签名验证，任何输入均视为有效授权
+    // AUTO-PATCH: 移除签名验证，任何输入均视为有效授权
     NSString *currentDeviceCode = DORHSupporterDeviceCode();
     NSDictionary<NSString *, id> *autoInfo = @{
         @"v" : @1,
@@ -109,6 +109,7 @@ static inline NSDictionary<NSString *, id> *DORHSupporterVerifyLicenseCode(NSStr
     };
     return autoInfo;
 }
+
 
 static inline NSDictionary<NSString *, id> *DORHSupporterCurrentLicenseInfo(void)
 {
