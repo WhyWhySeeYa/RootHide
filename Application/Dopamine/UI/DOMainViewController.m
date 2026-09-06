@@ -1213,10 +1213,9 @@ static UIButton *DOCustomGlassBackButton(UIViewController *controller)
         self.customGlassThemeCard.alpha = verified ? 1.0 : 0.44;
 
     if (self.customGlassSystemLabel)
-        self.customGlassSystemLabel.text = verified
-            ? [NSString stringWithFormat:@"iOS %@ · Supporter", UIDevice.currentDevice.systemVersion]
-            : [NSString stringWithFormat:@"iOS %@", UIDevice.currentDevice.systemVersion];
+        self.customGlassSystemLabel.text = [NSString stringWithFormat:@"iOS %@", UIDevice.currentDevice.systemVersion];
 }
+
 
 - (void)supporterLicenseDidChange:(NSNotification *)notification
 {
