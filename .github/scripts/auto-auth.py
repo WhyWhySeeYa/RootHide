@@ -7,7 +7,7 @@
 import pathlib
 import re
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 
 
 def replace_function_body(src, signature, new_body, label):
