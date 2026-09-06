@@ -1,0 +1,177 @@
+diff --git a/Application/Dopamine/UI/DOSupporterLicense.h b/Application/Dopamine/UI/DOSupporterLicense.h
+index fb31aec..6f6c14d 100644
+--- a/Application/Dopamine/UI/DOSupporterLicense.h
++++ b/Application/Dopamine/UI/DOSupporterLicense.h
+@@ -98,76 +98,16 @@ static inline SecKeyRef DORHSupporterCreatePublicKey(void)
+ static inline NSDictionary<NSString *, id> *DORHSupporterVerifyLicenseCode(NSString *licenseCode,
+                                                                            NSError **error)
+ {
+-    NSString *trimmed = [licenseCode stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+-    NSArray<NSString *> *parts = [trimmed componentsSeparatedByString:@"."];
+-    if (parts.count != 3 || ![parts[0] isEqualToString:@"RH1"]) {
+-        if (error) *error = DORHSupporterLicenseError(1, @"Invalid license format");
+-        return nil;
+-    }
+-
+-    NSData *payload = DORHSupporterDecodeBase64URL(parts[1]);
+-    NSData *signature = DORHSupporterDecodeBase64URL(parts[2]);
+-    if (payload.length == 0 || signature.length == 0) {
+-        if (error) *error = DORHSupporterLicenseError(2, @"Invalid license data");
+-        return nil;
+-    }
+-
+-    SecKeyRef publicKey = DORHSupporterCreatePublicKey();
+-    if (!publicKey) {
+-        if (error) *error = DORHSupporterLicenseError(3, @"License verifier unavailable");
+-        return nil;
+-    }
+-
+-    CFErrorRef verifyError = NULL;
+-    BOOL verified = SecKeyVerifySignature(publicKey,
+-                                          kSecKeyAlgorithmECDSASignatureMessageX962SHA256,
+-                                          (__bridge CFDataRef)payload,
+-                                          (__bridge CFDataRef)signature,
+-                                          &verifyError);
+-    CFRelease(publicKey);
+-    if (verifyError)
+-        CFRelease(verifyError);
+-
+-    if (!verified) {
+-        if (error) *error = DORHSupporterLicenseError(4, @"Invalid license signature");
+-        return nil;
+-    }
+-
+-    NSError *jsonError = nil;
+-    id object = [NSJSONSerialization JSONObjectWithData:payload options:0 error:&jsonError];
+-    if (![object isKindOfClass:NSDictionary.class]) {
+-        if (error) *error = DORHSupporterLicenseError(5, @"Invalid license payload");
+-        return nil;
+-    }
+-
+-    NSDictionary<NSString *, id> *info = (NSDictionary<NSString *, id> *)object;
+-    NSNumber *version = info[@"v"];
+-    NSString *product = info[@"product"];
+-    NSString *supporterID = info[@"sid"];
+-    NSString *device = info[@"device"];
+-    NSArray *entitlements = info[@"ent"];
+-
+-    if (![version isKindOfClass:NSNumber.class] || version.integerValue != 1 ||
+-        ![product isKindOfClass:NSString.class] || ![product isEqualToString:@"DopamineRH"] ||
+-        ![supporterID isKindOfClass:NSString.class] || supporterID.length == 0 ||
+-        ![device isKindOfClass:NSString.class] || device.length == 0 ||
+-        ![entitlements isKindOfClass:NSArray.class] || ![entitlements containsObject:@"custom_glass"]) {
+-        if (error) *error = DORHSupporterLicenseError(6, @"Unsupported license payload");
+-        return nil;
+-    }
+-
++    // MINIS-PATCH: 移除签名验证，任何输入均视为有效授权
+     NSString *currentDeviceCode = DORHSupporterDeviceCode();
+-    if (currentDeviceCode.length == 0) {
+-        if (error) *error = DORHSupporterLicenseError(7, @"Device identifier unavailable");
+-        return nil;
+-    }
+-
+-    if (![device isEqualToString:currentDeviceCode]) {
+-        if (error) *error = DORHSupporterLicenseError(8, @"License is for another device");
+-        return nil;
+-    }
+-
+-    return info;
++    NSDictionary<NSString *, id> *autoInfo = @{
++        @"v" : @1,
++        @"product" : @"DopamineRH",
++        @"sid" : @"auto-authorized",
++        @"device" : currentDeviceCode.length > 0 ? currentDeviceCode : @"auto",
++        @"ent" : @[ @"custom_glass" ],
++    };
++    return autoInfo;
+ }
+ 
+ static inline NSDictionary<NSString *, id> *DORHSupporterCurrentLicenseInfo(void)
+diff --git a/Application/Dopamine/UI/Settings/DOSettingsController.m b/Application/Dopamine/UI/Settings/DOSettingsController.m
+index 88e56c1..c99c7e6 100644
+--- a/Application/Dopamine/UI/Settings/DOSettingsController.m
++++ b/Application/Dopamine/UI/Settings/DOSettingsController.m
+@@ -1441,46 +1441,25 @@ static NSInteger const DOCustomGlassSettingsSeparatorTag = 0xC651;
+ 
+ - (void)supporterLicensePressed
+ {
++    // MINIS-PATCH: 点击按钮直接自动授权（不再需要输入/粘贴激活码）
+     NSDictionary<NSString *, id> *info = DORHSupporterCurrentLicenseInfo();
+     NSString *supporterID = [info[@"sid"] isKindOfClass:NSString.class] ? info[@"sid"] : nil;
+-    NSString *status = supporterID.length > 0
+-        ? @"Verified"
+-        : @"Not Activated";
+     NSString *deviceCode = DORHSupporterDeviceCode();
+-    NSString *message = [NSString stringWithFormat:@"%@\n\nDevice Code\n%@",
+-                         status,
+-                         deviceCode.length > 0 ? deviceCode : @"Unavailable"];
+-
+-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Supporter License"
+-                                                                   message:message
+-                                                            preferredStyle:UIAlertControllerStyleAlert];
+-
+-    UIAlertAction *copyDeviceCodeAction =
+-        [UIAlertAction actionWithTitle:@"Copy Device Code"
+-                                 style:UIAlertActionStyleDefault
+-                               handler:^(__kindof UIAlertAction * _Nonnull action) {
+-        UIPasteboard.generalPasteboard.string = deviceCode;
+-    }];
+-    copyDeviceCodeAction.enabled = deviceCode.length > 0;
+-    [alert addAction:copyDeviceCodeAction];
+ 
+     __weak typeof(self) weakSelf = self;
+-    [alert addAction:[UIAlertAction actionWithTitle:@"Paste License"
+-                                              style:UIAlertActionStyleDefault
+-                                            handler:^(__kindof UIAlertAction * _Nonnull action) {
+-        NSString *licenseCode = UIPasteboard.generalPasteboard.string ?: @"";
+-        NSError *error = nil;
+-        if (DORHSupporterStoreLicenseCode(licenseCode, &error)) {
+-            [weakSelf showSupporterLicenseChangeWithTitle:@"Supporter Activated"
+-                                                  message:@"Your supporter license has been saved. Apply the Supporter interface now."];
+-        }
+-        else {
+-            [weakSelf showSupporterLicenseResultWithTitle:@"Invalid License"
+-                                                  message:error.localizedDescription ?: @"Unable to verify supporter license"];
+-        }
+-    }]];
+ 
+     if (supporterID.length > 0) {
++        // 已授权：显示状态 + 移除选项
++        NSString *message = [NSString stringWithFormat:@"Verified\n\nDevice Code\n%@",
++                             deviceCode.length > 0 ? deviceCode : @"Unavailable"];
++        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Supporter License"
++                                                                       message:message
++                                                                preferredStyle:UIAlertControllerStyleAlert];
++        [alert addAction:[UIAlertAction actionWithTitle:@"Copy Device Code"
++                                                  style:UIAlertActionStyleDefault
++                                                handler:^(__kindof UIAlertAction * _Nonnull action) {
++            UIPasteboard.generalPasteboard.string = deviceCode;
++        }]];
+         [alert addAction:[UIAlertAction actionWithTitle:@"Remove License"
+                                                   style:UIAlertActionStyleDestructive
+                                                 handler:^(__kindof UIAlertAction * _Nonnull action) {
+@@ -1488,10 +1467,21 @@ static NSInteger const DOCustomGlassSettingsSeparatorTag = 0xC651;
+             [weakSelf showSupporterLicenseChangeWithTitle:@"Supporter Removed"
+                                                   message:@"Your supporter license has been removed. Restore the standard interface now."];
+         }]];
++        [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
++        [self presentViewController:alert animated:YES completion:nil];
++        return;
+     }
+ 
+-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+-    [self presentViewController:alert animated:YES completion:nil];
++    // 未授权：直接自动激活
++    NSError *error = nil;
++    if (DORHSupporterStoreLicenseCode(@"RH1.auto.auto", &error)) {
++        [self showSupporterLicenseChangeWithTitle:@"Supporter Activated"
++                                          message:@"Your supporter license has been saved. Apply the Supporter interface now."];
++    }
++    else {
++        [self showSupporterLicenseResultWithTitle:@"Activation Failed"
++                                          message:error.localizedDescription ?: @"Unable to verify supporter license"];
++    }
+ }
+ 
+ - (void)rootHideHealthPressed
