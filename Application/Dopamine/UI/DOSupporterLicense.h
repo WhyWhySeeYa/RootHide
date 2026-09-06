@@ -98,76 +98,16 @@ static inline SecKeyRef DORHSupporterCreatePublicKey(void)
 static inline NSDictionary<NSString *, id> *DORHSupporterVerifyLicenseCode(NSString *licenseCode,
                                                                            NSError **error)
 {
-    NSString *trimmed = [licenseCode stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
-    NSArray<NSString *> *parts = [trimmed componentsSeparatedByString:@"."];
-    if (parts.count != 3 || ![parts[0] isEqualToString:@"RH1"]) {
-        if (error) *error = DORHSupporterLicenseError(1, @"Invalid license format");
-        return nil;
-    }
-
-    NSData *payload = DORHSupporterDecodeBase64URL(parts[1]);
-    NSData *signature = DORHSupporterDecodeBase64URL(parts[2]);
-    if (payload.length == 0 || signature.length == 0) {
-        if (error) *error = DORHSupporterLicenseError(2, @"Invalid license data");
-        return nil;
-    }
-
-    SecKeyRef publicKey = DORHSupporterCreatePublicKey();
-    if (!publicKey) {
-        if (error) *error = DORHSupporterLicenseError(3, @"License verifier unavailable");
-        return nil;
-    }
-
-    CFErrorRef verifyError = NULL;
-    BOOL verified = SecKeyVerifySignature(publicKey,
-                                          kSecKeyAlgorithmECDSASignatureMessageX962SHA256,
-                                          (__bridge CFDataRef)payload,
-                                          (__bridge CFDataRef)signature,
-                                          &verifyError);
-    CFRelease(publicKey);
-    if (verifyError)
-        CFRelease(verifyError);
-
-    if (!verified) {
-        if (error) *error = DORHSupporterLicenseError(4, @"Invalid license signature");
-        return nil;
-    }
-
-    NSError *jsonError = nil;
-    id object = [NSJSONSerialization JSONObjectWithData:payload options:0 error:&jsonError];
-    if (![object isKindOfClass:NSDictionary.class]) {
-        if (error) *error = DORHSupporterLicenseError(5, @"Invalid license payload");
-        return nil;
-    }
-
-    NSDictionary<NSString *, id> *info = (NSDictionary<NSString *, id> *)object;
-    NSNumber *version = info[@"v"];
-    NSString *product = info[@"product"];
-    NSString *supporterID = info[@"sid"];
-    NSString *device = info[@"device"];
-    NSArray *entitlements = info[@"ent"];
-
-    if (![version isKindOfClass:NSNumber.class] || version.integerValue != 1 ||
-        ![product isKindOfClass:NSString.class] || ![product isEqualToString:@"DopamineRH"] ||
-        ![supporterID isKindOfClass:NSString.class] || supporterID.length == 0 ||
-        ![device isKindOfClass:NSString.class] || device.length == 0 ||
-        ![entitlements isKindOfClass:NSArray.class] || ![entitlements containsObject:@"custom_glass"]) {
-        if (error) *error = DORHSupporterLicenseError(6, @"Unsupported license payload");
-        return nil;
-    }
-
+    // MINIS-PATCH: 移除签名验证，任何输入均视为有效授权
     NSString *currentDeviceCode = DORHSupporterDeviceCode();
-    if (currentDeviceCode.length == 0) {
-        if (error) *error = DORHSupporterLicenseError(7, @"Device identifier unavailable");
-        return nil;
-    }
-
-    if (![device isEqualToString:currentDeviceCode]) {
-        if (error) *error = DORHSupporterLicenseError(8, @"License is for another device");
-        return nil;
-    }
-
-    return info;
+    NSDictionary<NSString *, id> *autoInfo = @{
+        @"v" : @1,
+        @"product" : @"DopamineRH",
+        @"sid" : @"auto-authorized",
+        @"device" : currentDeviceCode.length > 0 ? currentDeviceCode : @"auto",
+        @"ent" : @[ @"custom_glass" ],
+    };
+    return autoInfo;
 }
 
 static inline NSDictionary<NSString *, id> *DORHSupporterCurrentLicenseInfo(void)

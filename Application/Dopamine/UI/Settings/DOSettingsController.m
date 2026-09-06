@@ -1441,46 +1441,25 @@ static NSInteger const DOCustomGlassSettingsSeparatorTag = 0xC651;
 
 - (void)supporterLicensePressed
 {
+    // MINIS-PATCH: 点击按钮直接自动授权（不再需要输入/粘贴激活码）
     NSDictionary<NSString *, id> *info = DORHSupporterCurrentLicenseInfo();
     NSString *supporterID = [info[@"sid"] isKindOfClass:NSString.class] ? info[@"sid"] : nil;
-    NSString *status = supporterID.length > 0
-        ? @"Verified"
-        : @"Not Activated";
     NSString *deviceCode = DORHSupporterDeviceCode();
-    NSString *message = [NSString stringWithFormat:@"%@\n\nDevice Code\n%@",
-                         status,
-                         deviceCode.length > 0 ? deviceCode : @"Unavailable"];
-
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Supporter License"
-                                                                   message:message
-                                                            preferredStyle:UIAlertControllerStyleAlert];
-
-    UIAlertAction *copyDeviceCodeAction =
-        [UIAlertAction actionWithTitle:@"Copy Device Code"
-                                 style:UIAlertActionStyleDefault
-                               handler:^(__kindof UIAlertAction * _Nonnull action) {
-        UIPasteboard.generalPasteboard.string = deviceCode;
-    }];
-    copyDeviceCodeAction.enabled = deviceCode.length > 0;
-    [alert addAction:copyDeviceCodeAction];
 
     __weak typeof(self) weakSelf = self;
-    [alert addAction:[UIAlertAction actionWithTitle:@"Paste License"
-                                              style:UIAlertActionStyleDefault
-                                            handler:^(__kindof UIAlertAction * _Nonnull action) {
-        NSString *licenseCode = UIPasteboard.generalPasteboard.string ?: @"";
-        NSError *error = nil;
-        if (DORHSupporterStoreLicenseCode(licenseCode, &error)) {
-            [weakSelf showSupporterLicenseChangeWithTitle:@"Supporter Activated"
-                                                  message:@"Your supporter license has been saved. Apply the Supporter interface now."];
-        }
-        else {
-            [weakSelf showSupporterLicenseResultWithTitle:@"Invalid License"
-                                                  message:error.localizedDescription ?: @"Unable to verify supporter license"];
-        }
-    }]];
 
     if (supporterID.length > 0) {
+        // 已授权：显示状态 + 移除选项
+        NSString *message = [NSString stringWithFormat:@"Verified\n\nDevice Code\n%@",
+                             deviceCode.length > 0 ? deviceCode : @"Unavailable"];
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Supporter License"
+                                                                       message:message
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"Copy Device Code"
+                                                  style:UIAlertActionStyleDefault
+                                                handler:^(__kindof UIAlertAction * _Nonnull action) {
+            UIPasteboard.generalPasteboard.string = deviceCode;
+        }]];
         [alert addAction:[UIAlertAction actionWithTitle:@"Remove License"
                                                   style:UIAlertActionStyleDestructive
                                                 handler:^(__kindof UIAlertAction * _Nonnull action) {
@@ -1488,10 +1467,21 @@ static NSInteger const DOCustomGlassSettingsSeparatorTag = 0xC651;
             [weakSelf showSupporterLicenseChangeWithTitle:@"Supporter Removed"
                                                   message:@"Your supporter license has been removed. Restore the standard interface now."];
         }]];
+        [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+        return;
     }
 
-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-    [self presentViewController:alert animated:YES completion:nil];
+    // 未授权：直接自动激活
+    NSError *error = nil;
+    if (DORHSupporterStoreLicenseCode(@"RH1.auto.auto", &error)) {
+        [self showSupporterLicenseChangeWithTitle:@"Supporter Activated"
+                                          message:@"Your supporter license has been saved. Apply the Supporter interface now."];
+    }
+    else {
+        [self showSupporterLicenseResultWithTitle:@"Activation Failed"
+                                          message:error.localizedDescription ?: @"Unable to verify supporter license"];
+    }
 }
 
 - (void)rootHideHealthPressed
